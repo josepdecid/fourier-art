@@ -1,46 +1,34 @@
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 import Fourier, { IFourier } from './utils/Fourier'
 
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import data from '../samples/pentagram.json'
-
-// import { OrbitControls } from './orbit_controls.js'
-
 
 type Point = {
     x: number
     y: number
 }
 
+let windowContext: any = window;
 let camera: THREE.PerspectiveCamera
 let scene: THREE.Scene
 let renderer: THREE.WebGLRenderer
-// let controls: OrbitControls
+let controls: OrbitControls
 
-const xPoints = data.map(({ x }) => x);
-const yPoints = data.map(({ y }) => y);
-const maxX = Math.max(...xPoints);
-const minX = Math.min(...xPoints);
-const maxY = Math.max(...yPoints);
-const minY = Math.min(...yPoints);
-let path = data.map(({ x, y }) => ({
-    x: 2 * ((x - minX) / (maxX - minX) - 0.5),
-    y: 2 * ((y - minY) / (maxY - minY) - 0.5)
-}))
-
+let path: Point[] = centerDataPoints(data)
 let fourierX: IFourier[] = new Fourier().generateDiscreteFourierTransform(path, 1)
-let graphPoints: Point[] = [];
+let graphPoints: Point[] = []
 
 let time = 0;
-let showLoop = false;
 
-const Circles: { [id: number]: THREE.Mesh } = {};
-const Lines: { [id: number]: THREE.Line } = {};
+const Circles: { [id: number]: THREE.Mesh } = {}
+const Lines: { [id: number]: THREE.Line } = {}
 
 const drawCircle = (key: number, x: number, y: number, r: number) => {
     if (!(key in Circles)) {
         const geometry = new THREE.RingGeometry(r - 0.1 * r, r, 50)
-        
+
         const material = new THREE.MeshBasicMaterial({ color: 0x0000FF })
 
         Circles[key] = new THREE.Mesh(geometry, material)
@@ -64,15 +52,15 @@ const drawLine = (key: number, x1: number, y1: number, x2: number, y2: number) =
 
     const positions = Lines[key].geometry.attributes.position.array
     const bufferAttribute = new THREE.BufferAttribute(positions, 3)
-    
+
     bufferAttribute.setXYZ(0, x1, y1, 0)
     bufferAttribute.setXYZ(1, x2, y2, 0)
 }
 
 const drawCurve = (points: Point[]) => {
-    points.forEach((point, idx) => {
+    points.forEach(({x, y}, idx) => {
         if (idx + 1 >= points.length) return;
-        drawLine(idx, point.x, point.y, points[idx + 1].x, points[idx + 1].y);
+        drawLine(idx, x, y, points[idx + 1].x, points[idx + 1].y);
     })
 };
 
@@ -84,33 +72,43 @@ const epicycles = (x: number, y: number, fourierSeries: IFourier[]): Point => {
         const multTerm = frequency * time + phase
         x += amplitude * Math.cos(multTerm)
         y += amplitude * Math.sin(multTerm)
-
-        // drawLine(idx, prevX, prevY, x, y)
+        
         drawCircle(idx, prevX, prevY, amplitude)
     })
-
-    // drawCircle(-1, x, y, 2)
 
     return { x, y }
 }
 
 const startDrawing = () => {
     const point = epicycles(0, 0, fourierX)
-
-    graphPoints.unshift(point)
+    graphPoints.push(point)
+    
     drawCurve(graphPoints)
 
     time += (Math.PI * 2) / fourierX.length
 
-    if (time > 2 * Math.PI) {
-        time = 0;
-        !showLoop && (graphPoints = []);
-    }
-    if (graphPoints.length > path.length * 2) graphPoints.pop();
+    if (time > 2 * Math.PI)
+        time = 0
+
+    if (graphPoints.length > path.length * 2)
+        graphPoints.pop()
 };
 
 init();
 animate();
+
+function centerDataPoints(points: Point[]): Point[] {
+    const xPoints = points.map(({ x }) => x)
+    const yPoints = points.map(({ y }) => y)
+    const maxX = Math.max(...xPoints)
+    const minX = Math.min(...xPoints)
+    const maxY = Math.max(...yPoints)
+    const minY = Math.min(...yPoints)
+    return data.map(({ x, y }) => ({
+        x: 2 * ((x - minX) / (maxX - minX) - 0.5),
+        y: 2 * ((y - minY) / (maxY - minY) - 0.5)
+    }))
+}
 
 function init() {
     const scene = setupScene();
@@ -145,11 +143,11 @@ function setupScene(): THREE.Scene {
     scene.background = bgTexture
 
     renderer = new THREE.WebGLRenderer({ antialias: true })
-    renderer.setPixelRatio(window.devicePixelRatio)
-    renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer.setPixelRatio(windowContext.devicePixelRatio)
+    renderer.setSize(windowContext.innerWidth, windowContext.innerHeight)
 
     document.body.appendChild(renderer.domElement)
-    window.addEventListener('resize', onWindowResize)
+    windowContext.addEventListener('resize', onWindowResize)
 
     return scene
 }
@@ -158,13 +156,12 @@ function setupCameraAndControls(scene: THREE.Scene) {
     const near = 0.1;
     const far = 10;
 
-    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, near, far);
+    camera = new THREE.PerspectiveCamera(70, windowContext.innerWidth / windowContext.innerHeight, near, far);
     camera.position.set(0, 0, 3);
     camera.lookAt(scene.position);
 
-    /*
     controls = new OrbitControls(camera, renderer.domElement)
-    controls.listenToKeyEvents(window)
+    controls.listenToKeyEvents(windowContext)
 
     controls.enableDamping = true
     controls.dampingFactor = 0.05
@@ -175,7 +172,6 @@ function setupCameraAndControls(scene: THREE.Scene) {
     controls.maxDistance = far
 
     controls.maxPolarAngle = Math.PI / 2
-    */
 }
 
 function setupIllumination() {
@@ -192,15 +188,15 @@ function setupIllumination() {
 }
 
 function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = windowContext.innerWidth / windowContext.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(windowContext.innerWidth, windowContext.innerHeight);
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    // controls.update();
-
+    controls.update();
     startDrawing();
+
     renderer.render(scene, camera);
 }
