@@ -1,21 +1,23 @@
 import ComplexNumber from './ComplexNumber';
+import { arrLinspace } from './misc';
 
 export type IFourier = {
     r: number
     i: number
     frequency: number
     amplitude: number
-    phase: number 
+    phase: number
 }
 
 class Fourier {
-    generateDiscreteFourierTransform(points: any[], skip: number): IFourier[] {
+    generateDiscreteFourierTransform(points: any[], numCircles: number): IFourier[] {
         let x = []
         let fourier = []
-        const offset = { x: 0, y: 0 }
 
-        for (let i = 0; i < points.length; i += skip) {
-            x.push(new ComplexNumber(points[i].x - offset.x, points[i].y - offset.y))
+        const linSpacedArray = arrLinspace(0, points.length - 1, numCircles);        
+        for (let i = 0; i < linSpacedArray.length; ++i) {
+            const idx = Math.round(linSpacedArray[i])
+            x.push(new ComplexNumber(points[idx].x, points[idx].y))
         }
 
         fourier = this._discreteFourierTransform(x)

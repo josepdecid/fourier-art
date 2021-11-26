@@ -12,7 +12,12 @@
     "noEmit": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noImplicitReturns": true
+    "noImplicitReturns": true,
+    "paths": {
+      "three/examples/jsm/libs/dat.gui.module": [
+        "../../node_modules/@types/dat.gui"
+      ]
+    }
   },
-  "include": ["./src"]
+  "include": ["**/*.ts"]
 }

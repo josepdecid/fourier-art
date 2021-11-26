@@ -2,8 +2,14 @@ import * as THREE from 'three'
 
 import Fourier, { IFourier } from './utils/Fourier'
 
+import { GUI } from 'three/examples/jsm/libs/dat.gui.module'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import data from '../samples/pentagram.json'
+
+export const params = {
+    'Time Scale': 1,
+    'Number of Circles': 300
+}
 
 type Point = {
     x: number
@@ -16,9 +22,9 @@ let scene: THREE.Scene
 let renderer: THREE.WebGLRenderer
 let controls: OrbitControls
 
-let path: Point[] = centerDataPoints(data)
-let fourierX: IFourier[] = new Fourier().generateDiscreteFourierTransform(path, 1)
-let graphPoints: Point[] = []
+export let path: Point[] = centerDataPoints(data)
+export let graphPoints: Point[] = []
+export let fourierX: IFourier[] = new Fourier().generateDiscreteFourierTransform(path, params['Number of Circles'])
 
 let time = 0;
 
@@ -58,7 +64,7 @@ const drawLine = (key: number, x1: number, y1: number, x2: number, y2: number) =
 }
 
 const drawCurve = (points: Point[]) => {
-    points.forEach(({x, y}, idx) => {
+    points.forEach(({ x, y }, idx) => {
         if (idx + 1 >= points.length) return;
         drawLine(idx, x, y, points[idx + 1].x, points[idx + 1].y);
     })
@@ -72,7 +78,7 @@ const epicycles = (x: number, y: number, fourierSeries: IFourier[]): Point => {
         const multTerm = frequency * time + phase
         x += amplitude * Math.cos(multTerm)
         y += amplitude * Math.sin(multTerm)
-        
+
         drawCircle(idx, prevX, prevY, amplitude)
     })
 
@@ -82,10 +88,10 @@ const epicycles = (x: number, y: number, fourierSeries: IFourier[]): Point => {
 const startDrawing = () => {
     const point = epicycles(0, 0, fourierX)
     graphPoints.push(point)
-    
+
     drawCurve(graphPoints)
 
-    time += (Math.PI * 2) / fourierX.length
+    time += params['Time Scale'] * ((Math.PI * 2) / fourierX.length)
 
     if (time > 2 * Math.PI)
         time = 0
@@ -113,8 +119,18 @@ function centerDataPoints(points: Point[]): Point[] {
 function init() {
     const scene = setupScene();
     setupCameraAndControls(scene);
-    setupWorld();
-    setupIllumination();
+    setupWorld()
+    setupGUI()
+}
+
+function setupGUI() {
+    const gui = new GUI()
+
+    gui.add(params, 'Time Scale', 0, 5, 0.1).listen()
+    gui.add(params, 'Number of Circles', 1, 50, 1).onChange(value => {
+        scene.remove.apply(scene, scene.children)
+        fourierX = new Fourier().generateDiscreteFourierTransform(path, value)
+    })
 }
 
 function setupWorld() {
@@ -122,12 +138,6 @@ function setupWorld() {
     path.forEach(({ x, y }) => {
         points.push(new THREE.Vector3(x, y, 0))
     })
-
-    /*const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: 0xFF00FF });
-    const line = new THREE.Line(geometry, material);
-
-    scene.add(line);*/
 }
 
 function setupScene(): THREE.Scene {
@@ -174,19 +184,6 @@ function setupCameraAndControls(scene: THREE.Scene) {
     controls.maxPolarAngle = Math.PI / 2
 }
 
-function setupIllumination() {
-    const dirLight1 = new THREE.DirectionalLight(0xffffff);
-    dirLight1.position.set(1, 1, 1);
-    scene.add(dirLight1);
-
-    const dirLight2 = new THREE.DirectionalLight(0x002288);
-    dirLight2.position.set(- 1, - 1, - 1);
-    scene.add(dirLight2);
-
-    const ambientLight = new THREE.AmbientLight(0x222222);
-    scene.add(ambientLight);
-}
-
 function onWindowResize() {
     camera.aspect = windowContext.innerWidth / windowContext.innerHeight;
     camera.updateProjectionMatrix();
@@ -197,6 +194,6 @@ function animate() {
     requestAnimationFrame(animate);
     controls.update();
     startDrawing();
-
+    
     renderer.render(scene, camera);
 }
